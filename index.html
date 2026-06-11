@@ -474,9 +474,3 @@ Replace your entire `index.html` file with this fully optimized version:
     </script>
 </body>
 </html>
-```
-
-### 🛠️ What has successfully changed under the hood?
-1. **Source Loading Fixed:** Added `video.load();` directly inside the `changeProject()` block (line $167$). Changing dropdown routes will now force a hard container stream load, resolving player freezing.
-2. **Third Video Removed:** Stripped option `project-3` from both your `<select>` HTML element (line $59$) and the `projectVideos` dictionary (lines $158$–$161$) completely.
-3. **Labels Polished:** Updated dropdown values to say **"Section 1"** and **"Section 2"** rather than just numbers, creating a cleaner UI layout for clients.
