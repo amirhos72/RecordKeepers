@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeStudios - Video Review</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase CDN for free real-time database -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            background-color: #0c0c0e;
+            color: #f4f4f5;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121214;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans">
+
+    <!-- PASSWORD LOCK SCREEN -->
+    <div id="password-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black px-4">
+        <div class="bg-[#121214] p-8 rounded-xl border border-zinc-800 shadow-2xl max-w-md w-full text-center">
+            <div class="w-16 h-16 bg-white/10 text-white rounded-full flex items-center justify-center mx-auto mb-6 border border-zinc-800">
+                <i class="fa-solid fa-lock text-xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2 tracking-tight">BeStudios Review Portal</h2>
+            <p class="text-zinc-400 text-sm mb-6">Please enter your password to access this live cut.</p>
+            <form id="password-form" onsubmit="checkPassword(event)">
+                <input type="password" id="password-input" placeholder="Enter password..." class="w-full bg-black border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white transition mb-4 text-center tracking-wider text-sm">
+                <p id="password-error" class="text-white text-xs bg-red-950/40 border border-red-900/50 py-2 rounded-lg mb-4 hidden">Incorrect password. Please try again.</p>
+                <button type="submit" class="w-full bg-white hover:bg-zinc-200 text-black font-semibold py-3 px-4 rounded-lg transition duration-200 text-sm">
+                    Unlock Video
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTENT (hidden until unlocked) -->
+    <div id="app-content" class="hidden flex-1 flex flex-col">
+        <!-- HEADER -->
+        <header class="bg-[#121214] border-b border-zinc-800 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-black font-black text-xl">B</div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none tracking-tight">BeStudios</h1>
+                    <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold block mt-1">Video Feedback Hub</span>
+                </div>
+            </div>
+
+            <!-- Client Project Selector -->
+            <div class="flex items-center gap-3">
+                <label for="project-select" class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Sections:</label>
+                <select id="project-select" onchange="changeProject()" class="bg-black border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500 transition">
+                    <option value="project-1">1</option>
+                    <option value="project-2">2</option>
+                    <option value="project-3">3</option>
+                </select>
+                <button onclick="logout()" class="text-xs text-zinc-405 hover:text-white transition ml-2 border border-zinc-800 rounded px-2 py-1 bg-black"><i class="fa-solid fa-right-from-bracket mr-1"></i> Exit</button>
+            </div>
+        </header>
+
+        <!-- DATABASE STATUS WARNING -->
+        <div id="db-alert" class="bg-amber-500/10 border-b border-amber-500/20 text-amber-500 px-6 py-2 text-xs flex justify-between items-center hidden">
+            <span><i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Running in <strong>Local Preview</strong> mode. Comments will only save in this browser.</span>
+        </div>
+
+        <!-- MAIN LAYOUT -->
+        <main class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+            <!-- Left Side: Video & Add Comment -->
+            <div class="lg:col-span-2 flex flex-col gap-4">
+                <div class="bg-black rounded-lg overflow-hidden border border-zinc-800 shadow-xl aspect-video relative group">
+                    <video id="video-player" src="https://www.dropbox.com/scl/fi/4a6fmzhp6293gc0ezlzvn/Part1-2.mp4?rlkey=7nshm9giniydoejnfcm4y5llv&st=qmx52ou4&raw=1" controls class="w-full h-full object-contain"></video>
+                </div>
+
+                <!-- Comment Form -->
+                <div class="bg-[#121214] p-5 rounded-lg border border-zinc-800">
+                    <h3 class="font-bold text-sm uppercase tracking-wider mb-4 flex items-center justify-between text-zinc-300">
+                        <span>Leave Timestamped Note</span>
+                        <span id="timestamp-badge" class="bg-white/10 text-white font-mono text-xs px-2.5 py-1 rounded border border-zinc-800">
+                            Current: 00:00
+                        </span>
+                    </h3>
+                    <form id="comment-form" onsubmit="submitComment(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-405 uppercase tracking-wider mb-2">Author Name</label>
+                                <input type="text" id="comment-author" required placeholder="e.g., Client, Producer, Editor" class="w-full bg-black border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-405 uppercase tracking-wider mb-2">Selected Time</label>
+                                <div class="relative">
+                                    <input type="text" id="comment-time" readonly class="w-full bg-[#1c1c1e] border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-400 font-mono focus:outline-none select-none">
+                                    <button type="button" onclick="captureCurrentTime()" class="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 hover:bg-zinc-700 text-xs px-2.5 py-1.5 rounded text-white transition font-semibold">Capture</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-405 uppercase tracking-wider mb-2">Your Feedback Note</label>
+                            <textarea id="comment-text" required placeholder="Describe adjustments (e.g. Cut 3 frames here, change caption color...)" rows="3" class="w-full bg-black border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 transition resize-none"></textarea>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-white hover:bg-zinc-200 text-black font-semibold py-2.5 px-6 rounded-lg text-xs uppercase tracking-wider transition">
+                                <i class="fa-solid fa-paper-plane mr-2"></i> Submit Feedback
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Side: Comments List -->
+            <div class="flex flex-col bg-[#121214] border border-zinc-800 rounded-lg h-[calc(100vh-140px)] min-h-[500px]">
+                <div class="p-4 border-b border-zinc-800 flex justify-between items-center">
+                    <h2 class="font-bold text-sm tracking-wider uppercase flex items-center gap-2 text-zinc-300">
+                        <i class="fa-solid fa-comments text-white"></i> Feedback History
+                    </h2>
+                    <span id="comment-count" class="bg-black text-zinc-400 border border-zinc-800 px-2 py-0.5 rounded text-xs font-mono">0 Notes</span>
+                </div>
+
+                <div id="comments-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Dynamic comments go here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        const PORTAL_PASSWORD = "Bestudiosonly"; 
+        
+        // SUPABASE DATABASE KEYS
+        let SUPABASE_URL = "https://gizhkvzduxmhpyijsbgn.supabase.co/rest/v1/"; 
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpemhrdnpkdXhtaHB5aWpzYmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzM5ODUsImV4cCI6MjA5Njc0OTk4NX0.PVaflP_BKka1wVj6iUzSI_jf1lIsO1bfZWsD1CA6uV4"; 
+
+        if (SUPABASE_URL.endsWith('/rest/v1/')) {
+            SUPABASE_URL = SUPABASE_URL.replace('/rest/v1/', '');
+        } else if (SUPABASE_URL.endsWith('/rest/v1')) {
+            SUPABASE_URL = SUPABASE_URL.replace('/rest/v1', '');
+        }
+
+        let dbInstance = null; 
+        let currentProject = "project-1";
+        let localComments = [];
+
+        const video = document.getElementById('video-player');
+        const isSupabaseConfigured = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";
+
+        window.onload = function() {
+            if (sessionStorage.getItem('authenticated') === 'true') {
+                document.getElementById('password-screen').style.display = 'none';
+                document.getElementById('app-content').classList.remove('hidden');
+                initializeApp();
+            }
+
+            if (!isSupabaseConfigured) {
+                document.getElementById('db-alert').classList.remove('hidden');
+            }
+        }
+
+        const projectVideos = {
+            "project-1": "https://www.dropbox.com/scl/fi/4a6fmzhp6293gc0ezlzvn/Part1-2.mp4?rlkey=7nshm9giniydoejnfcm4y5llv&st=qmx52ou4&raw=1",
+            "project-2": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", 
+            "project-3": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        }
+
+        function changeProject() {
+            currentProject = document.getElementById('project-select').value;
+            video.src = projectVideos[currentProject];
+            renderComments();
+        }
+
+        // PASSWORD AUTHENTICATION
+        function checkPassword(event) {
+            event.preventDefault();
+            const input = document.getElementById('password-input').value;
+            if (input.trim() === PORTAL_PASSWORD) {
+                sessionStorage.setItem('authenticated', 'true');
+                document.getElementById('password-screen').style.display = 'none';
+                document.getElementById('app-content').classList.remove('hidden');
+                initializeApp();
+            } else {
+                document.getElementById('password-error').classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('authenticated');
+            location.reload();
+        }
+
+        // INITIALIZE APPLICATION
+        function initializeApp() {
+            if (isSupabaseConfigured) {
+                try {
+                    dbInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    fetchSupabaseComments();
+                } catch(e) {
+                    console.error("Initialization Failed:", e);
+                }
+            } else {
+                const cached = localStorage.getItem('localComments');
+                localComments = cached ? JSON.parse(cached) : getDefaultLocalComments();
+                renderComments();
+            }
+
+            video.addEventListener('timeupdate', () => {
+                const cur = formatTime(video.currentTime);
+                document.getElementById('timestamp-badge').innerText = `Current: ${cur}`;
+                if (document.activeElement !== document.getElementById('comment-text')) {
+                    document.getElementById('comment-time').value = cur;
+                }
+            });
+
+            document.getElementById('comment-time').value = "00:00";
+        }
+
+        function captureCurrentTime() {
+            document.getElementById('comment-time').value = formatTime(video.currentTime);
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function parseTime(timeStr) {
+            const parts = timeStr.split(':');
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
+        function getDefaultLocalComments() {
+            return [
+                { id: "1", project_id: "project-1", author: "Lead Editor", time_stamp: "00:05", comment: "Speed up this intro zoom transition. Feels a bit laggy.", resolved: false, replies: [] },
+                { id: "2", project_id: "project-1", author: "Director", time_stamp: "00:12", comment: "The background is too exposed; we need to pull back the highlight color grade here.", resolved: false, replies: [
+                    { author: "Colorist", comment: "Copy that, I'll pull it down around 1.5 stops." }
+                ]}
+            ];
+        }
+
+        // FETCH COMMENTS FROM SUPABASE
+        async function fetchSupabaseComments() {
+            if (!dbInstance) return;
+            try {
+                let { data: comments, error } = await dbInstance
+                    .from('comments')
+                    .select('*')
+                    .order('time_stamp', { ascending: true });
+                
+                if (error) throw error;
+                localComments = comments || [];
+                renderComments();
+            } catch (err) {
+                console.error("Database connection error: ", err);
+            }
+        }
+
+        // SUBMIT A COMMENT
+        async function submitComment(event) {
+            event.preventDefault();
+            const author = document.getElementById('comment-author').value;
+            const time_stamp = document.getElementById('comment-time').value;
+            const text = document.getElementById('comment-text').value;
+
+            const newComment = {
+                id: Date.now().toString(),
+                project_id: currentProject,
+                author: author,
+                time_stamp: time_stamp,
+                comment: text,
+                resolved: false,
+                replies: []
+            };
+
+            if (isSupabaseConfigured && dbInstance) {
+                try {
+                    const { error } = await dbInstance.from('comments').insert([newComment]);
+                    if (error) throw error;
+                    await fetchSupabaseComments();
+                } catch (err) {
+                    alert("Sync Error: Check your DB table schema.");
+                }
+            } else {
+                localComments.push(newComment);
+                localStorage.setItem('localComments', JSON.stringify(localComments));
+                renderComments();
+            }
+
+            document.getElementById('comment-text').value = '';
+        }
+
+        // DELETE COMMENTS (New Feature)
+        async function deleteComment(id) {
+            if (!confirm("Are you sure you want to permanently delete this comment? This cannot be undone.")) return;
+
+            if (isSupabaseConfigured && dbInstance) {
+                try {
+                    const { error } = await dbInstance
+                        .from('comments')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+                    await fetchSupabaseComments();
+                } catch (err) {
+                    alert("Sync Error: Could not delete from live database.");
+                }
+            } else {
+                localComments = localComments.filter(c => c.id !== id);
+                localStorage.setItem('localComments', JSON.stringify(localComments));
+                renderComments();
+            }
+        }
+
+        // RESOLVE COMMENTS
+        async function toggleResolve(id) {
+            let targetComment = localComments.find(c => c.id === id);
+            if (!targetComment) return;
+            const updatedState = !targetComment.resolved;
+
+            if (isSupabaseConfigured && dbInstance) {
+                try {
+                    const { error } = await dbInstance
+                        .from('comments')
+                        .update({ resolved: updatedState })
+                        .eq('id', id);
+                    if (error) throw error;
+                    await fetchSupabaseComments();
+                } catch (err) {
+                    alert("Failure updating resolve state.");
+                }
+            } else {
+                targetComment.resolved = updatedState;
+                localStorage.setItem('localComments', JSON.stringify(localComments));
+                renderComments();
+            }
+        }
+
+        // REPLY TO COMMENTS
+        async function submitReply(commentId, authorInputId, contentInputId) {
+            const author = document.getElementById(authorInputId).value;
+            const body = document.getElementById(contentInputId).value;
+            if (!author || !body) return;
+
+            let targetComment = localComments.find(c => c.id === commentId);
+            if (!targetComment) return;
+
+            if (!targetComment.replies) targetComment.replies = [];
+            targetComment.replies.push({ author, comment: body });
+
+            if (isSupabaseConfigured && dbInstance) {
+                try {
+                    const { error } = await dbInstance
+                        .from('comments')
+                        .update({ replies: targetComment.replies })
+                        .eq('id', commentId);
+                    if (error) throw error;
+                    await fetchSupabaseComments();
+                } catch (err) {
+                    alert("Failed to save reply.");
+                }
+            } else {
+                localStorage.setItem('localComments', JSON.stringify(localComments));
+                renderComments();
+            }
+        }
+
+        function jumpVideoTo(timeStamp) {
+            const secs = parseTime(timeStamp);
+            video.currentTime = secs;
+            video.play();
+        }
+
+        // RENDER METHOD (UPDATED DISPLAY)
+        function renderComments() {
+            const container = document.getElementById('comments-container');
+            container.innerHTML = '';
+            
+            const filteredComments = localComments.filter(c => c.project_id === currentProject);
+            filteredComments.sort((a, b) => parseTime(a.time_stamp) - parseTime(b.time_stamp));
+
+            document.getElementById('comment-count').innerText = `${filteredComments.length} Notes`;
+
+            if (filteredComments.length === 0) {
+                container.innerHTML = `
+                <div class="h-64 flex flex-col items-center justify-center text-zinc-500 text-center px-4">
+                    <i class="fa-solid fa-feather text-2xl mb-3"></i>
+                    <p class="font-bold text-xs uppercase tracking-wide">No notes yet</p>
+                    <p class="text-[11px] max-w-[200px] mt-1">Play the video and log recommendations to get started.</p>
+                </div>`;
+                return;
+            }
+
+            filteredComments.forEach(c => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-lg flex flex-col justify-between border transition relative ${c.resolved ? 'bg-zinc-900/40 border-zinc-800/50 opacity-40' : 'bg-black border-zinc-800'}`;
+
+                let replyMarkup = '';
+                if (c.replies && c.replies.length > 0) {
+                    replyMarkup = `<div class="mt-3 pl-3 border-l border-zinc-700 space-y-2 text-xs">`;
+                    c.replies.forEach(r => {
+                        replyMarkup += `
+                        <div>
+                            <strong class="text-zinc-400 font-semibold">${r.author}:</strong>
+                            <span class="text-zinc-200">${r.comment}</span>
+                        </div>`;
+                    });
+                    replyMarkup += `</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-semibold text-zinc-400 tracking-wide uppercase">${c.author}</span>
+                            <button onclick="jumpVideoTo('${c.time_stamp}')" class="text-left py-0.5 px-2 bg-white/10 hover:bg-white/20 border border-zinc-800 text-white font-mono text-[11px] rounded mt-1.5 inline-flex items-center gap-1.5 w-fit">
+                                <i class="fa-solid fa-play text-[9px]"></i> ${c.time_stamp}
+                            </button>
+                        </div>
+                        
+                        <!-- Actions Container: Resolve & Delete -->
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="toggleResolve('${c.id}')" title="${c.resolved ? 'Mark Unresolved' : 'Mark Completed'}" class="w-7 h-7 rounded bg-zinc-900 hover:bg-zinc-800 text-xs flex items-center justify-center border border-zinc-800 transition">
+                                <i class="fa-solid fa-check ${c.resolved ? 'text-white' : 'text-zinc-650'}"></i>
+                            </button>
+                            <button onclick="deleteComment('${c.id}')" title="Delete Comment" class="w-7 h-7 rounded bg-zinc-900 hover:bg-red-950 hover:border-red-900 text-xs flex items-center justify-center border border-zinc-800 transition group">
+                                <i class="fa-solid fa-trash-can text-zinc-650 group-hover:text-red-400 transition-colors"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-sm text-zinc-200 break-words leading-relaxed ${c.resolved ? 'line-through text-zinc-500' : ''}">${c.comment}</p>
+                    
+                    ${replyMarkup}
+
+                    <div class="mt-3 pt-3 border-t border-zinc-900">
+                        <div class="flex items-center gap-2 gap-y-1 flex-wrap">
+                            <input type="text" id="rep-auth-${c.id}" placeholder="Reply as..." class="bg-zinc-900 border border-zinc-800 rounded px-2 py-0.5 text-[11px] text-zinc-300 w-24 focus:outline-none focus:border-zinc-500">
+                            <input type="text" id="rep-body-${c.id}" placeholder="Type quick response..." class="bg-zinc-900 border border-zinc-800 rounded px-2 py-0.5 text-[11px] text-zinc-300 flex-1 focus:outline-none focus:border-zinc-500">
+                            <button onclick="submitReply('${c.id}', 'rep-auth-${c.id}', 'rep-body-${c.id}')" class="bg-white hover:bg-zinc-200 text-black py-0.5 px-2.5 text-[10px] uppercase font-bold tracking-wide rounded transition">Reply</button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
