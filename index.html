@@ -1,16 +1,4 @@
-The reason your second video was not playing is a classic web browser behavior: **when you change a video's URL using JavaScript, most browsers require you to explicitly tell the player to reload the hardware engine.** 
 
-Without adding a `video.load()` command, the browser keeps trying to play the first video block and freezes!
-
-I have resolved this issue, removed the third project option entirely, and cleaned up the dropdown selectors to display a crisp **"Section 1"** and **"Section 2"**.
-
----
-
-### The Final Corrected Code
-
-Replace your entire `index.html` file with this fully optimized version:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
